@@ -1,5 +1,5 @@
 // File: test-race.js
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImlkIjoxLCJlbWFpbCI6InVzZXJAdGVzdC5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc3Nzc2NzI4OSwiZXhwIjoxNzc3ODUzNjg5fQ.SG9N7_0J6F2qwcVIGDE2NeeULs77Qu7vPP91AAy88Iw"; // Copy Token từ Postman dán vào đây
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImlkIjoxLCJlbWFpbCI6InVzZXJAdGVzdC5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc3ODE2Mjk3NSwiZXhwIjoxNzc4MjQ5Mzc1fQ.UE_QqVdJduPvAZZ17qZQJJOX2vqUOrHNSi62MOKgBT0"; // Copy Token từ Postman dán vào đây
 const URL = "http://localhost:3000/bookings";
 const IDEM_KEY = "PRO_RACE_TEST_" + Date.now();
 

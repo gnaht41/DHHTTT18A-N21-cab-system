@@ -1621,7 +1621,8 @@ node test-performance-auto-scaling.js
 
 POST: ``http://localhost:3000/bookings``
 
-```{
+```
+{
   "pickup": { "lat": 10.76, "lng": 106.66 },
   "drop": { "lat": 10.77, "lng": 106.70 },
   "distance_km": 5,
@@ -1647,7 +1648,8 @@ POST: ``http://localhost:3000/bookings``
 
 POST: ``http://localhost:3000/bookings``
 
-```{
+```
+{
   "pickup": { "lat": 10.76, "lng": 106.66 },
   "drop": { "lat": 10.77, "lng": 106.70 },
   "distance_km": 5,
@@ -1684,7 +1686,8 @@ POST: ``http://localhost:3000/bookings``
 **Hình 1: Tạo đơn hàng thành công dù Kafka đang sập (Resilience)**
 POST: ``http://localhost:3000/bookings``
 
-```{
+```
+{
   "pickup": { "lat": 10.76, "lng": 106.66 },
   "drop": { "lat": 10.77, "lng": 106.70 },
   "distance_km": 5,
@@ -1754,7 +1757,8 @@ Lệnh: ``node test-tc75.js``
 
 POST: ``http://localhost:3000/bookings``
 
-```{
+```
+{
   "pickup": { "lat": 10.76, "lng": 106.66 },
   "drop": { "lat": 10.77, "lng": 106.70 },
   "distance_km": 5,
@@ -1832,7 +1836,8 @@ chạy lệnh: `docker-compose logs -f booking-service`
 POST: ``http://localhost:3000/auth/login``
 Body:
 
-```{
+```
+{
     "email": "' OR 1=1 --",
     "password": "[PASSWORD]"
 }
@@ -1855,13 +1860,12 @@ POST:     ``http://localhost:3000/bookings``
 Body:
 
 ```
-    {
-        "pickup": "<script>alert('xss')</script>",
-        "drop": "10.77,106.70",
-        "distance": 5,
-        "payment_method": "cash"
-
-    }
+{
+  "pickup": "<script>alert('xss')</script>",
+  "drop": "10.77,106.70",
+  "distance": 5,
+  "payment_method": "cash"
+}
 ```
 
 ![alt text](img/image-107.png)
@@ -1936,10 +1940,10 @@ chạy lệnh: `node test-tc85.js`
 
 ```
 {
-    "pickup": {"lat": 10.76, "lng": 106.66},
-    "drop": {"lat": 10.76, "lng": 106.70},
-    "distance_km": 5,
-    "payment_method": "cash"
+  "pickup": {"lat": 10.76, "lng": 106.66},
+  "drop": {"lat": 10.76, "lng": 106.70},
+  "distance_km": 5,
+  "payment_method": "cash"
 }
 ```
 
@@ -1954,10 +1958,10 @@ Headers:
 
 ```
 {
-    "pickup": {"lat": 10.76, "lng": 106.66},
-    "drop": {"lat": 10.76, "lng": 106.70},
-    "distance_km": 5,
-    "payment_method": "cash"
+  "pickup": {"lat": 10.76, "lng": 106.66},
+  "drop": {"lat": 10.76, "lng": 106.70},
+  "distance_km": 5,
+  "payment_method": "cash"
 }
 ```
 
@@ -2026,7 +2030,7 @@ POST: ``http://localhost:3000/search?tab=check``
 Body:
 
 ```
- {
+{
   "role": "driver",
   "action": "manage_users",
   "resource": "admin_panel"
@@ -2187,7 +2191,6 @@ Body:
 
 ```
 {
-  
   "role": "user",
   "action": "access_admin_dashboard",
   "resource": "/admin/dashboard"
@@ -2215,7 +2218,6 @@ Body:
 
 ```
 {
-  
   "role": "driver",
   "action": "read_personal_data",
   "resource": "/users/{user_id}"
