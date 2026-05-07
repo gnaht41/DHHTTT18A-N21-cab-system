@@ -1,0 +1,14 @@
+# DRIVER SERVICE - Environment Configuration
+# Database Per Service: driver_db
+
+PORT=3003
+
+# Database Configuration - ISOLATED (driver_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=driver_db
+
+# Kafka for location updates and events
+KAFKA_BROKER=kafka:9092

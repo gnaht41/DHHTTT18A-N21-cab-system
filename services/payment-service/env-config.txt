@@ -1,0 +1,19 @@
+# PAYMENT SERVICE - Environment Configuration
+# Database Per Service: payment_db
+
+PORT=3005
+
+# Database Configuration - ISOLATED (payment_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=payment_db
+
+# Inter-service communication (NO direct DB access)
+USER_SERVICE_URL=http://user-service:3006
+RIDE_SERVICE_URL=http://ride-service:3004
+NOTIFICATION_SERVICE_URL=http://notification-service:3010
+
+# Kafka for payment events
+KAFKA_BROKER=kafka:9092

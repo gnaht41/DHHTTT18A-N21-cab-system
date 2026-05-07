@@ -1,0 +1,19 @@
+# REVIEW SERVICE - Environment Configuration
+# Database Per Service: review_db
+
+PORT=3009
+
+# Database Configuration - ISOLATED (review_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=review_db
+
+# Inter-service communication (NO direct DB access)
+USER_SERVICE_URL=http://user-service:3006
+RIDE_SERVICE_URL=http://ride-service:3004
+DRIVER_SERVICE_URL=http://driver-service:3003
+
+# Kafka for review events
+KAFKA_BROKER=kafka:9092

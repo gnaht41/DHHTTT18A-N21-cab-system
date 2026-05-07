@@ -1,0 +1,17 @@
+# NOTIFICATION SERVICE - Environment Configuration
+# Database Per Service: notification_db
+
+PORT=3010
+
+# Database Configuration - ISOLATED (notification_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=notification_db
+
+# Inter-service communication (NO direct DB access)
+USER_SERVICE_URL=http://user-service:3006
+
+# Kafka for consuming events from all services
+KAFKA_BROKER=kafka:9092

@@ -1,0 +1,20 @@
+# RIDE SERVICE - Environment Configuration
+# Database Per Service: ride_db
+
+PORT=3004
+
+# Database Configuration - ISOLATED (ride_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=ride_db
+
+# Inter-service communication (NO direct DB access)
+DRIVER_SERVICE_URL=http://driver-service:3003
+BOOKING_SERVICE_URL=http://booking-service:3002
+USER_SERVICE_URL=http://user-service:3006
+NOTIFICATION_SERVICE_URL=http://notification-service:3010
+
+# Kafka for ride status events
+KAFKA_BROKER=kafka:9092

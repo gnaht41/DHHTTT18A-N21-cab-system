@@ -1,0 +1,481 @@
+version: "3.8"
+
+# =====================================================
+# OPTION A: 1 PostgreSQL Instance + Multiple Databases
+# Production Recommended - Easier backup, less overhead
+# =====================================================
+#
+# SO SÁNH OPTION A vs OPTION B:
+#
+# OPTION A (1 PostgreSQL, nhiều database):
+# ✓ Ưu điểm:
+#   - Tiết kiệm memory/CPU (chỉ 1 container)
+#   - Backup/restore toàn bộ hệ thống dễ dàng
+#   - Quản lý tập trung
+#   - Tiết kiệm port mapping (chỉ cần 1 port)
+# ✗ Nhược điểm:
+#   - Single point of failure (nếu PostgreSQL down, tất cả services affected)
+#   - Khó scale database riêng lẻ cho từng service
+#   - Resource không được cô lập hoàn toàn
+#
+# OPTION B (Mỗi service 1 PostgreSQL):
+# ✓ Ưu điểm:
+#   - True isolation (cô lập hoàn toàn)
+#   - Scale độc lập từng service DB
+#   - Không có single point of failure DB
+# ✗ Nhược điểm:
+#   - Tốn memory/CPU (9 PostgreSQL containers)
+#   - Quản lý backup phức tạp
+#   - Nhiều port mapping
+#   - Khó khăn khi nâng cấp PostgreSQL version
+#
+# RECOMMENDATION: Option A cho production vì đơn giản hơn
+# và đủ tốt cho hầu hết use cases.
+
+services:
+  # ===========================================
+  # SHARED INFRASTRUCTURE
+  # ===========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: cab_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # PostgreSQL tự động tạo database nếu chưa tồn tại
+      # khi service connect lần đầu
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Script tự động tạo databases khi khởi động
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: cab_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: cab_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # ===========================================
+  # API GATEWAY
+  # ===========================================
+  api-gateway:
+    image: node:18-alpine
+    container_name: cab_api_gateway
+    working_dir: /app
+    volumes:
+      - ./api-gateway:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: super_secret_jwt_key_here
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3006
+      BOOKING_SERVICE_URL: http://booking-service:3002
+      DRIVER_SERVICE_URL: http://driver-service:3003
+      RIDE_SERVICE_URL: http://ride-service:3004
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      PRICING_SERVICE_URL: http://pricing-service:3008
+      REVIEW_SERVICE_URL: http://review-service:3009
+      NOTIFICATION_SERVICE_URL: http://notification-service:3010
+      AI_SERVICE_URL: http://ai-service:3011
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - kafka
+
+  # ===========================================
+  # AUTH SERVICE - Database: auth_db
+  # Chỉ chứa: authentication data (email, password, role)
+  # ===========================================
+  auth-service:
+    image: node:18-alpine
+    container_name: cab_auth_service
+    working_dir: /app
+    volumes:
+      - ./services/auth-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      JWT_SECRET: super_secret_jwt_key_here
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: auth_db
+      # Redis for JWT token caching
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Service URLs for inter-service communication
+      USER_SERVICE_URL: http://user-service:3006
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # ===========================================
+  # USER SERVICE - Database: user_db
+  # Chứa: user profiles (name, phone, avatar, addresses)
+  # ===========================================
+  user-service:
+    image: node:18-alpine
+    container_name: cab_user_service
+    working_dir: /app
+    volumes:
+      - ./services/user-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3006:3006"
+    environment:
+      PORT: 3006
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: user_db
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # BOOKING SERVICE - Database: booking_db
+  # Chứa: bookings, ride requests
+  # ===========================================
+  booking-service:
+    image: node:18-alpine
+    container_name: cab_booking_service
+    working_dir: /app
+    volumes:
+      - ./services/booking-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: booking_db
+      # Inter-service communication (NO direct DB access)
+      USER_SERVICE_URL: http://user-service:3006
+      DRIVER_SERVICE_URL: http://driver-service:3003
+      RIDE_SERVICE_URL: http://ride-service:3004
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # DRIVER SERVICE - Database: driver_db
+  # Chứa: driver profiles, vehicles, locations, earnings
+  # ===========================================
+  driver-service:
+    image: node:18-alpine
+    container_name: cab_driver_service
+    working_dir: /app
+    volumes:
+      - ./services/driver-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: driver_db
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # RIDE SERVICE - Database: ride_db
+  # Chứa: rides, trip status, route data
+  # ===========================================
+  ride-service:
+    image: node:18-alpine
+    container_name: cab_ride_service
+    working_dir: /app
+    volumes:
+      - ./services/ride-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: ride_db
+      # Inter-service communication (NO direct DB access)
+      DRIVER_SERVICE_URL: http://driver-service:3003
+      BOOKING_SERVICE_URL: http://booking-service:3002
+      USER_SERVICE_URL: http://user-service:3006
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # PAYMENT SERVICE - Database: payment_db
+  # Chứa: payments, transactions, wallet
+  # ===========================================
+  payment-service:
+    image: node:18-alpine
+    container_name: cab_payment_service
+    working_dir: /app
+    volumes:
+      - ./services/payment-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: 3005
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: payment_db
+      # Inter-service communication (NO direct DB access)
+      USER_SERVICE_URL: http://user-service:3006
+      RIDE_SERVICE_URL: http://ride-service:3004
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # PRICING SERVICE - Database: pricing_db
+  # Chứa: pricing rules, surge multipliers, estimates
+  # ===========================================
+  pricing-service:
+    image: node:18-alpine
+    container_name: cab_pricing_service
+    working_dir: /app
+    volumes:
+      - ./services/pricing-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3008:3008"
+    environment:
+      PORT: 3008
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: pricing_db
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # AI SERVICE - Mock ETA calculations
+  # ===========================================
+  ai-service:
+    image: node:18-alpine
+    container_name: cab_ai_service
+    working_dir: /app
+    volumes:
+      - ./services/ai-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3011:3011"
+    environment:
+      PORT: 3011
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      - kafka
+
+  # ===========================================
+  # FRAUD SERVICE - Mock fraud detection
+  # ===========================================
+  fraud-service:
+    image: node:18-alpine
+    container_name: cab_fraud_service
+    working_dir: /app
+    volumes:
+      - ./services/fraud-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3012:3012"
+    environment:
+      PORT: 3012
+    depends_on:
+      - kafka
+
+  # ===========================================
+  # REVIEW SERVICE - Database: review_db
+  # Chứa: reviews, ratings
+  # ===========================================
+  review-service:
+    image: node:18-alpine
+    container_name: cab_review_service
+    working_dir: /app
+    volumes:
+      - ./services/review-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3009:3009"
+    environment:
+      PORT: 3009
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: review_db
+      # Inter-service communication (NO direct DB access)
+      USER_SERVICE_URL: http://user-service:3006
+      RIDE_SERVICE_URL: http://ride-service:3004
+      DRIVER_SERVICE_URL: http://driver-service:3003
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # ===========================================
+  # NOTIFICATION SERVICE - Database: notification_db + MongoDB
+  # Chứa: notifications, preferences, delivery logs
+  # ===========================================
+  notification-service:
+    image: node:18-alpine
+    container_name: cab_notification_service
+    working_dir: /app
+    volumes:
+      - ./services/notification-service:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3010:3010"
+    environment:
+      PORT: 3010
+      # Database config - ISOLATED
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: notification_db
+      # Redis for notification queue/caching
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MongoDB for notification history
+      MONGODB_URI: mongodb://root:root@mongodb:27017/notification_db?authSource=admin
+      # Inter-service communication (NO direct DB access)
+      USER_SERVICE_URL: http://user-service:3006
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+  # ===========================================
+  # REDIS CACHE
+  # Dùng cho: JWT token cache, session storage, rate limiting
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: cab_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  # ===========================================
+  # MONGODB
+  # Dùng cho: Notification history, analytics logs, audit trail
+  # ===========================================
+  mongodb:
+    image: mongo:6.0.16
+    container_name: cab_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: notification_db
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: mongod --auth
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:

@@ -1,0 +1,305 @@
+/**
+ * BOOKING SERVICE - Refactored Example
+ * 
+ * This shows how booking-service should use inter-service communication
+ * instead of direct database access
+ */
+
+const bookingRepository = require('../repositories/bookingRepository');
+const {
+  userServiceClient,
+  driverServiceClient,
+  pricingServiceClient,
+  notificationServiceClient,
+} = require('../utils/serviceClient');
+const { publishBookingCreated, publishBookingAssigned } = require('../events/bookingEvents');
+
+class BookingService {
+  /**
+   * Create a new booking
+   * 
+   * FLOW:
+   * 1. Validate user exists (call user-service API)
+   * 2. Calculate price estimate (call pricing-service API)
+   * 3. Create booking in booking_db (local DB)
+   * 4. Find nearby drivers (call driver-service API)
+   * 5. Send notifications (call notification-service API)
+   * 6. Publish booking created event (Kafka)
+   */
+  async createBooking(userId, pickup, destination, vehicleType = 'standard') {
+    // 1. Validate user exists via HTTP API
+    // ANTI-PATTERN: await User.query("SELECT * FROM users WHERE id = ?", [userId])
+    // CORRECT: Call user-service API
+    const userProfile = await userServiceClient.getProfile(userId);
+    if (!userProfile) {
+      throw new Error('User not found');
+    }
+
+    console.log(`Creating booking for user: ${userProfile.fullName} (${userId})`);
+
+    // 2. Get price estimate from pricing-service
+    const priceEstimate = await pricingServiceClient.calculateEstimate({
+      pickup: { latitude: pickup.lat, longitude: pickup.lng },
+      destination: { latitude: destination.lat, longitude: destination.lng },
+      vehicleType,
+    });
+
+    // 3. Create booking in LOCAL database (booking_db only)
+    const booking = await bookingRepository.create({
+      userId, // Store reference only, not full user data
+      pickup: pickup.address,
+      pickupLatitude: pickup.lat,
+      pickupLongitude: pickup.lng,
+      destination: destination.address,
+      destinationLatitude: destination.lat,
+      destinationLongitude: destination.lng,
+      price: priceEstimate.amount,
+      currency: priceEstimate.currency,
+      status: 'PENDING',
+      vehicleType,
+      estimatedDistance: priceEstimate.distance,
+      estimatedDuration: priceEstimate.duration,
+    });
+
+    // 4. Find available drivers via HTTP API
+    // ANTI-PATTERN: await Driver.query("SELECT * FROM drivers WHERE status = 'AVAILABLE'")
+    // CORRECT: Call driver-service API
+    const nearbyDrivers = await driverServiceClient.findNearby(
+      { latitude: pickup.lat, longitude: pickup.lng },
+      { radius: 5000, limit: 5 }
+    );
+
+    console.log(`Found ${nearbyDrivers.length} nearby drivers for booking ${booking.id}`);
+
+    // 5. Send notification to user
+    await notificationServiceClient.sendNotification({
+      userId,
+      type: 'BOOKING_CREATED',
+      title: 'Finding your driver',
+      message: `We're looking for a ${vehicleType} vehicle near ${pickup.address}`,
+      data: {
+        bookingId: booking.id,
+        estimatedPrice: priceEstimate.amount,
+      },
+    });
+
+    // 6. Publish event for async processing
+    // Other services can react to this event
+    await publishBookingCreated({
+      bookingId: booking.id,
+      userId,
+      pickup,
+      destination,
+      price: priceEstimate.amount,
+      nearbyDrivers: nearbyDrivers.map(d => d.id),
+    });
+
+    return {
+      ...booking.toJSON(),
+      // Include user info from API call (not from DB)
+      user: {
+        id: userProfile.userId,
+        name: userProfile.fullName,
+        phone: userProfile.phone,
+      },
+      // Include driver options from API call
+      availableDrivers: nearbyDrivers.map(d => ({
+        id: d.id,
+        name: d.name,
+        rating: d.rating,
+        vehicle: d.vehicle,
+        estimatedArrival: d.estimatedArrivalMinutes,
+      })),
+    };
+  }
+
+  /**
+   * Assign driver to booking
+   * 
+   * FLOW:
+   * 1. Update booking status in booking_db
+   * 2. Assign driver via driver-service API
+   * 3. Send notification to driver
+   * 4. Send notification to user
+   * 5. Publish booking assigned event
+   */
+  async assignDriver(bookingId, driverId) {
+    // 1. Get booking from local DB
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking) {
+      throw new Error('Booking not found');
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw new Error(`Cannot assign driver. Booking status is ${booking.status}`);
+    }
+
+    // 2. Verify driver and assign via HTTP API
+    // This also updates driver status in driver_db
+    const driver = await driverServiceClient.getDriver(driverId);
+    if (!driver) {
+      throw new Error('Driver not found');
+    }
+
+    if (driver.status !== 'AVAILABLE') {
+      throw new Error('Driver is not available');
+    }
+
+    await driverServiceClient.assignBooking(driverId, bookingId);
+
+    // 3. Update booking in local DB
+    await bookingRepository.update(bookingId, {
+      status: 'DRIVER_ASSIGNED',
+      driverId,
+      assignedAt: new Date(),
+    });
+
+    // 4. Send notification to driver
+    await notificationServiceClient.sendNotification({
+      userId: driver.userId,
+      type: 'DRIVER_ASSIGNMENT',
+      title: 'New Ride Request',
+      message: `Pickup at ${booking.pickup}`,
+      data: {
+        bookingId,
+        pickup: booking.pickup,
+        destination: booking.destination,
+        price: booking.price,
+      },
+    });
+
+    // 5. Send notification to user
+    const userProfile = await userServiceClient.getProfile(booking.userId);
+    await notificationServiceClient.sendNotification({
+      userId: booking.userId,
+      type: 'DRIVER_ASSIGNED',
+      title: 'Driver found!',
+      message: `${driver.name} is on the way in a ${driver.vehicle}`,
+      data: {
+        bookingId,
+        driverId,
+        driverName: driver.name,
+        driverRating: driver.rating,
+        vehicle: driver.vehicle,
+        estimatedArrival: driver.estimatedArrivalMinutes,
+      },
+    });
+
+    // 6. Publish event
+    await publishBookingAssigned({
+      bookingId,
+      driverId,
+      userId: booking.userId,
+    });
+
+    return {
+      bookingId,
+      status: 'DRIVER_ASSIGNED',
+      driver: {
+        id: driver.id,
+        name: driver.name,
+        phone: driver.phone,
+        rating: driver.rating,
+        vehicle: driver.vehicle,
+        licensePlate: driver.licensePlate,
+      },
+    };
+  }
+
+  /**
+   * Get booking with full details
+   * 
+   * This demonstrates aggregating data from multiple services
+   * WITHOUT joining database tables
+   */
+  async getBookingDetails(bookingId) {
+    // 1. Get booking from local DB
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking) {
+      return null;
+    }
+
+    // 2. Fetch user profile via HTTP API (parallel call)
+    const userProfilePromise = userServiceClient.getProfile(booking.userId);
+
+    // 3. Fetch driver info if assigned (parallel call)
+    const driverPromise = booking.driverId
+      ? driverServiceClient.getDriver(booking.driverId)
+      : Promise.resolve(null);
+
+    // 4. Wait for both calls
+    const [userProfile, driver] = await Promise.all([userProfilePromise, driverPromise]);
+
+    // 5. Return aggregated data
+    return {
+      id: booking.id,
+      status: booking.status,
+      price: booking.price,
+      currency: booking.currency,
+      pickup: {
+        address: booking.pickup,
+        latitude: booking.pickupLatitude,
+        longitude: booking.pickupLongitude,
+      },
+      destination: {
+        address: booking.destination,
+        latitude: booking.destinationLatitude,
+        longitude: booking.destinationLongitude,
+      },
+      // User data from API call
+      user: userProfile ? {
+        id: userProfile.userId,
+        name: userProfile.fullName,
+        phone: userProfile.phone,
+        avatar: userProfile.avatarUrl,
+      } : null,
+      // Driver data from API call
+      driver: driver ? {
+        id: driver.id,
+        name: driver.name,
+        phone: driver.phone,
+        rating: driver.rating,
+        vehicle: driver.vehicle,
+        licensePlate: driver.licensePlate,
+        currentLocation: driver.location,
+      } : null,
+      createdAt: booking.createdAt,
+      updatedAt: booking.updatedAt,
+    };
+  }
+
+  /**
+   * Get user's booking history
+   * 
+   * Note: Only fetches from booking_db, then enriches with user data
+   */
+  async getUserBookingHistory(userId, options = {}) {
+    // 1. Verify user exists
+    const userExists = await userServiceClient.exists(userId);
+    if (!userExists) {
+      throw new Error('User not found');
+    }
+
+    // 2. Get bookings from local DB (only booking_db)
+    const bookings = await bookingRepository.findByUserId(userId, {
+      limit: options.limit || 10,
+      offset: options.offset || 0,
+      orderBy: 'createdAt',
+      order: 'DESC',
+    });
+
+    // 3. Return with minimal data
+    // Full details can be fetched via getBookingDetails if needed
+    return bookings.map(booking => ({
+      id: booking.id,
+      status: booking.status,
+      price: booking.price,
+      currency: booking.currency,
+      pickup: booking.pickup,
+      destination: booking.destination,
+      createdAt: booking.createdAt,
+    }));
+  }
+}
+
+module.exports = new BookingService();

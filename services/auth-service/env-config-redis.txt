@@ -1,0 +1,28 @@
+# ===================================
+# AUTH SERVICE - ENV CONFIG
+# ===================================
+
+# Server
+PORT=3001
+
+# Database (PostgreSQL)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=auth_db
+
+# JWT Secret
+JWT_SECRET=super_secret_jwt_key_here
+
+# Redis Cache (for JWT token verification)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_ENABLED=true
+
+# Service URLs (inter-service communication)
+USER_SERVICE_URL=http://user-service:3006
+KAFKA_BROKER=kafka:9092
+
+# Logging
+LOG_LEVEL=info

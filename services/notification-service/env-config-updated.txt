@@ -1,0 +1,53 @@
+# ===================================
+# NOTIFICATION SERVICE - ENV CONFIG
+# ===================================
+
+# Server
+PORT=3010
+
+# Database (PostgreSQL)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=notification_db
+
+# MongoDB (for notification history)
+MONGODB_URI=mongodb://root:root@localhost:27017/notification_db?authSource=admin
+MONGODB_ENABLED=true
+
+# Redis Cache (for notification queue)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_ENABLED=true
+REDIS_NOTIFICATION_QUEUE_PREFIX=notification:queue:
+
+# Kafka
+KAFKA_BROKER=kafka:9092
+KAFKA_CONSUMER_GROUP=notification-group
+
+# Service URLs
+USER_SERVICE_URL=http://user-service:3006
+RIDE_SERVICE_URL=http://ride-service:3004
+BOOKING_SERVICE_URL=http://booking-service:3002
+PAYMENT_SERVICE_URL=http://payment-service:3005
+
+# Email Config (for notifications)
+EMAIL_ENABLED=false
+EMAIL_SERVICE=sendgrid
+SENDGRID_API_KEY=your_sendgrid_key_here
+
+# SMS Config
+SMS_ENABLED=false
+SMS_SERVICE=twilio
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+
+# Socket.IO
+SOCKET_IO_ENABLED=true
+
+# Logging
+LOG_LEVEL=info
+
+# Notification TTL (days)
+NOTIFICATION_RETENTION_DAYS=30

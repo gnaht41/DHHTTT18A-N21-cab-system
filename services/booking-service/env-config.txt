@@ -1,0 +1,21 @@
+# BOOKING SERVICE - Environment Configuration
+# Database Per Service: booking_db
+
+PORT=3002
+
+# Database Configuration - ISOLATED (booking_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=booking_db
+
+# Inter-service communication (NO direct DB access)
+USER_SERVICE_URL=http://user-service:3006
+DRIVER_SERVICE_URL=http://driver-service:3003
+RIDE_SERVICE_URL=http://ride-service:3004
+PRICING_SERVICE_URL=http://pricing-service:3008
+NOTIFICATION_SERVICE_URL=http://notification-service:3010
+
+# Kafka for async events
+KAFKA_BROKER=kafka:9092

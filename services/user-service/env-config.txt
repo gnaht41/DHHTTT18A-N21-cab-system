@@ -1,0 +1,14 @@
+# USER SERVICE - Environment Configuration
+# Database Per Service: user_db
+
+PORT=3006
+
+# Database Configuration - ISOLATED (user_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=user_db
+
+# Kafka for consuming auth events
+KAFKA_BROKER=kafka:9092

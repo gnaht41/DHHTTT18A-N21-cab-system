@@ -1,0 +1,14 @@
+# PRICING SERVICE - Environment Configuration
+# Database Per Service: pricing_db
+
+PORT=3008
+
+# Database Configuration - ISOLATED (pricing_db only)
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=pricing_db
+
+# Kafka for pricing updates
+KAFKA_BROKER=kafka:9092
