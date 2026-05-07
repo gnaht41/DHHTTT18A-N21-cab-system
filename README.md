@@ -592,7 +592,9 @@ docker exec cab_kafka kafka-console-consumer --bootstrap-server localhost:9092 -
   ![alt text](img/image-37.png)
 - Lần 3
   ![alt text](img/image-38.png)
-- Tắt pricing-service trong docker
+
+### Tắt pricing-service trong docker
+
 - Thực hiện đặt xe
 - Phương thức: POST
 - URL: [http://localhost:3000/bookings](http://localhost:3000/bookings)
@@ -615,6 +617,8 @@ docker exec cab_kafka kafka-console-consumer --bootstrap-server localhost:9092 -
 - Giá vẫn được tính trong khoảng 8->25
   ![alt text](img/image-39.png)
   ![alt text](img/image-40.png)
+
+### Lưu ý khi xong phải bật lại
 
 # Test case level 4
 
@@ -639,6 +643,25 @@ docker exec cab_kafka kafka-console-consumer --bootstrap-server localhost:9092 -
 ```
 
 ![alt text](img/image-44.png)
+
+```
+Chuẩn bị cửa sổ theo dõi Log (Chứng minh Transaction chạy)
+
+docker logs cab_booking_service --tail 50
+```
+
+```
+- Với DB commit thành công:
+docker exec -it cab_postgres psql -U postgres -d booking_db
+
+Xem Booking vừa tạo:
+SELECT id, status, price FROM bookings ORDER BY id DESC LIMIT 1;
+
+Xem Outbox Event (Chứng minh Transaction/No Partial Write):
+SELECT * FROM outbox_events WHERE "aggregateId" = id_muon_xem;
+
+Nếu muốn thoát khỏi psql, hãy gõ \q.
+```
 
 ## TC 32: Rollback khi lỗi giữa chừng
 
@@ -752,6 +775,8 @@ docker exec cab_kafka kafka-console-consumer --bootstrap-server localhost:9092 -
   ![alt text](img/image-51.png)
 
 ## TC 36: Saga transaction – success flow
+
+### Saga Transaction là một cách để quản lý các giao dịch kéo dài qua nhiều service khác nhau mà vẫn đảm bảo dữ liệu được nhất quán
 
 - Tạo 1 booking mới (ví dụ đang có id là 30)
 - Phương thức: POST
