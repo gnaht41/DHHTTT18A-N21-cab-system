@@ -383,6 +383,7 @@ Giải thích từng trường trong output:
 - Phương thức: POST
 - URL: [http://localhost:3000/bookings](http://localhost:3000/bookings)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
+- Header: x-idempotency-key  - TEST_KEY_POSTMAN_1
 
 ```json
 {
@@ -658,7 +659,7 @@ Xem Booking vừa tạo:
 SELECT id, status, price FROM bookings ORDER BY id DESC LIMIT 1;
 
 Xem Outbox Event (Chứng minh Transaction/No Partial Write):
-SELECT * FROM outbox_events WHERE "aggregateId" = id_muon_xem;
+SELECT * FROM outbox_events WHERE "aggregateId" = 'id_muon_xem';
 
 Nếu muốn thoát khỏi psql, hãy gõ \q.
 ```
@@ -694,7 +695,7 @@ Nếu muốn thoát khỏi psql, hãy gõ \q.
 - Phương thức: POST
 - URL: [http://localhost:3000/bookings](http://localhost:3000/bookings)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
-- Header: x-idempotency-key: ROLLBACK_TEST_v2
+- Header: x-user-id: 1
 
 ```json
 {
@@ -717,13 +718,13 @@ Nếu muốn thoát khỏi psql, hãy gõ \q.
 - Phương thức: POST
 - URL: [http://localhost:3000/payments](http://localhost:3000/payments)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
-- Header: x-idempotency-key: ROLLBACK_TEST_v2
+- Header: x-user-id: 1
 
 ```json
 {
-    "bookingId": 16,
+    "bookingId": id ban nay,
     "rideId": 999,
-    "amount": -10,
+    "amount": -1,
     "payment_method": "card"
 }
 ```
@@ -734,7 +735,7 @@ Nếu muốn thoát khỏi psql, hãy gõ \q.
 - Phương thức: GET
 - URL: [http://localhost:3000/bookings/booking_id_ban_nay](http://localhost:3000/bookings/booking_id_ban_nay)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
-- Header: x-idempotency-key: ROLLBACK_TEST_v2
+- Header: x-user-id: 1
 
 ![alt text](img/image-47.png)
 
@@ -828,6 +829,7 @@ Nếu muốn thoát khỏi psql, hãy gõ \q.
 - Phương thức: POST
 - URL: [http://localhost:3000/bookings](http://localhost:3000/bookings)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
+- Header: x-user-id: 1
 
 ```json
 {
@@ -849,11 +851,11 @@ Nếu muốn thoát khỏi psql, hãy gõ \q.
 - Phương thức: POST
 - URL: [http://localhost:3000/payments](http://localhost:3000/payments)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
-
+- Header: x-user-id: 1
 ```json
 {
     "bookingId": booking_id_vua_tao,
-    "rideId": 102,
+    "rideId": 100,
     "amount": -10,
     "payment_method": "card"
 }
@@ -865,7 +867,7 @@ Nếu muốn thoát khỏi psql, hãy gõ \q.
 - Phương thức: GET
 - URL: [http://localhost:3000/bookings/booking_id_vua_tao](http://localhost:3000/bookings/booking_id_vua_tao)
 - Authorization: Chọn Bearer và dán token (nếu quên bấm vào tc2 login lại)
-
+- Header: x-user-id: 1
 ![alt text](img/image-57.png)
 
 ## TC 38: Kafka event consistency (outbox pattern)
@@ -1332,7 +1334,7 @@ User hỏi: "Giá cước chuyến đi từ Quận 1 đến Quận 7 là bao nhi
 User hỏi: "Cho tôi biết ETA là gì và tài xế bao lâu nữa thì tới?" -> Agent điều hướng tới tool: eta_service
 User hỏi: "Có vẻ tài xế này đang gian lận, có fraud không?" -> Agent điều hướng tới tool: fraud_service
 
-node test-ai-orchestrator.js
+node test-ai-gent-orchestrator.js
 
 ![alt text](img/image-74.png)
 
@@ -1736,7 +1738,9 @@ GET: ``http://localhost:3002/health/outbox``
 *Ghi chú: Cơ chế này đảm bảo tính "Eventual Consistency" (Sự nhất quán cuối cùng) cho hệ thống Microservices.*
 
 ## TC 75: Circuit Breaker - Ngắt mạch bảo vệ hệ thống (Resilience)
-
+```
+Circuit Breaker (Cầu chì điện tử) là một mẫu thiết kế (design pattern) cực kỳ quan trọng trong Microservices để giúp hệ thống không bị "sập dây chuyền" khi một dịch vụ gặp sự cố.
+```
 - **Ngữ cảnh:** Dịch vụ tính giá (`pricing-service`) bị lỗi liên tục hoặc không phản hồi.
 - **Mục tiêu:** Kiểm tra khả năng tự động ngắt mạch của Booking Service để tránh làm treo hệ thống và sử dụng giá dự phòng (Fallback).
 
@@ -1824,6 +1828,9 @@ Lệnh: ``node test-tc77.js``
 - **Kết luận:** Đáp ứng hoàn hảo yêu cầu về **Degrade gracefully** (xuống cấp nhịp nhàng) và **Self-healing** (tự hồi phục).
 
 ### Hình ảnh minh chứng
+```
+docker network disconnect <ten_container>_default cab_pricing_service
+```
 
 docker network disconnect cab-booking-pass-level_default cab_pricing_service
 ![alt text](img/image-102.png)
@@ -1883,7 +1890,7 @@ Body:
 
 POST:     ``http://localhost:3000/bookings``
 Body:
-
+Token: Cua Token User
 ```
 {
   "pickup": "<script>alert('xss')</script>",
@@ -2051,7 +2058,7 @@ GET: ``http://localhost:3000/security/encryption-status``
 
 ### Hình ảnh minh chứng
 
-POST: ``http://localhost:3000/search?tab=check``
+POST: ``http://localhost:3000/security/rbac-check``
 Body:
 
 ```
@@ -2084,8 +2091,14 @@ Body:
 
 ```
 {
-  "text": "My credit card is 4111-1111-1111-1111 and phone 0901234567"
+  "data": {
+    "email": "vanloc@example.com",
+    "phone": "0912345678",
+    "credit_card": "1234567887654321",
+    "password": "my_secret_password"
+  }
 }
+
 ```
 
 ![alt text](img/image-117.png)
@@ -2339,7 +2352,7 @@ x-forwarded-via-gateway: api-gateway-v1
   Headers:
 
 ```
-x-simutale-https: true
+x-simulate-https: true
 ```
 
 ![alt text](img/image-129.png)
