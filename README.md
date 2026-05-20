@@ -1,10 +1,10 @@
-# 🚕 Cab Booking System - Microservices & AI-Powered (DHHTTT18A-N21)
+# Cab Booking System - Microservices & AI-Powered (DHHTTT18A-N21)
 
 Hệ thống đặt xe công nghệ toàn diện được xây dựng theo kiến trúc **Microservices**, kết hợp sức mạnh của **Generative AI (LLM)** để thay thế cho các mô hình Machine Learning truyền thống trong việc điều phối xe, định giá (Pricing) và dự báo. 
 
 Dự án chú trọng đặc biệt vào các khía cạnh cốt lõi của một hệ thống phân tán quy mô lớn: **Đảm bảo tính toàn vẹn dữ liệu (ACID/Saga), Khả năng chịu lỗi (Resilience), Hiệu năng cao (Performance)** và **Bảo mật tối đa (Zero Trust Security)**.
 
-## 🌟 Tính năng nổi bật (Key Features)
+## Tính năng nổi bật (Key Features)
 
 ### 1. Kiến trúc Microservices & Hệ thống phân tán
 * **API Gateway:** Định tuyến (routing), Rate Limiting, và xác thực tập trung.
@@ -32,7 +32,7 @@ Sử dụng **Gemini 2.5 Flash Lite** để suy luận thời gian thực thay v
 
 ---
 
-## 🏗️ Kiến trúc Công nghệ (Tech Stack)
+## Kiến trúc Công nghệ (Tech Stack)
 
 * **Backend:** Node.js, JavaScript/TypeScript.
 * **Database:** PostgreSQL (lưu trữ ACID), Redis (Caching hiệu năng cao).
@@ -42,28 +42,14 @@ Sử dụng **Gemini 2.5 Flash Lite** để suy luận thời gian thực thay v
 
 ---
 
-## 🧪 Chiến lược Kiểm thử Hệ thống (Comprehensive Testing Strategy)
-
-Dự án được validate bằng hệ thống kịch bản kiểm thử (Test Cases) gồm 10 cấp độ, từ luồng cơ bản đến các bài test ép tải và phá hủy hệ thống:
-
-* **Level 1-2: Core Flow & Edge Cases:** Xác thực người dùng, tạo Booking, kiểm tra tính hợp lệ của input, hết hạn JWT, xử lý logic tài xế Offline/Online.
-* **Level 3-4: Distributed Systems:** Đảm bảo tính ACID của database, cơ chế Saga khi thanh toán lỗi, Outbox Pattern ghi nhận event, Xử lý Race Condition.
-* **Level 5: AI Generative Reliability:** Kiểm thử AI ảo giác (Hallucination), Fallback khi AI lỗi, xử lý Outlier (dữ liệu cực đoan) và ML Drift detection.
-* **Level 6: Multi-Agent Orchestration:** Kiểm thử AI Agent tự động chọn tool (Routing), xử lý khi thiếu context, và ưu tiên Multi-objective.
-* **Level 7: Performance & Auto-scaling:** Chịu tải 1000 RPS, đảm bảo P95 Latency < 200ms, DB Pool limits, Redis Cache Hit-rate > 90%, và Auto-scale Pods theo CPU/Memory.
-* **Level 8: Resilience (Chaos Engineering):** Chủ động đánh sập Kafka, ngắt mạng các service (Network Partition), test Circuit Breaker mở/đóng.
-* **Level 9-10: Security & Zero Trust:** Khai thác SQLi, bypass API Gateway, test mTLS handshake, Token Tampering, và Audit Logging.
-
----
-
 ## 🚀 Hướng dẫn cài đặt (Getting Started)
 
 ### Yêu cầu hệ thống
 * Docker & Docker Compose
 * Node.js (>= 18.x)
 
-### Cài đặt và khởi chạy
-1. **Clone repository:**
-   ```bash
-   git clone [https://github.com/gnaht41/DHHTTT18A-N21-cab-system.git](https://github.com/gnaht41/DHHTTT18A-N21-cab-system.git)
-   cd DHHTTT18A-N21-cab-system
+```
+npm i
+docker compose up -d --build
+docker compose down -v
+```
